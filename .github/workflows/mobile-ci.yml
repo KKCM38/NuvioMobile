@@ -1,0 +1,111 @@
+name: Mobile CI
+
+on:
+  push:
+    branches:
+      - feature/dynamic-home-background
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  common:
+    name: Compile shared Kotlin
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local properties
+        run: touch local.properties
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Compile common Kotlin metadata
+        run: ./gradlew compileCommonMainKotlinMetadata --stacktrace
+
+  android:
+    name: Build Android debug APK
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Android SDK
+        uses: android-actions/setup-android@v3
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local properties
+        run: echo "sdk.dir=$ANDROID_HOME" > local.properties
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Build Full debug APK
+        run: ./gradlew assembleFullDebug --stacktrace
+
+      - name: Locate APK
+        run: find . -type f -name "*.apk" -print
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuvio-full-debug-apk
+          path: |
+            **/build/outputs/apk/**/*.apk
+          if-no-files-found: error
+          retention-days: 14
+
+  ios:
+    name: Compile iOS simulator target
+    runs-on: macos-latest
+    timeout-minutes: 45
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local properties
+        run: touch local.properties
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Compile common Kotlin metadata
+        run: ./gradlew compileCommonMainKotlinMetadata --stacktrace
+
+      - name: Compile iOS simulator target
+        run: ./gradlew :composeApp:compileKotlinIosSimulatorArm64 --stacktrace
