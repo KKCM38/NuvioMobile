@@ -109,3 +109,82 @@ jobs:
 
       - name: Compile iOS simulator target
         run: ./gradlew :composeApp:compileKotlinIosSimulatorArm64 --stacktrace
+
+  ios-app:
+    name: Build unsigned iOS simulator app
+    runs-on: macos-latest
+    timeout-minutes: 60
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local properties
+        run: touch local.properties
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Show Xcode configuration
+        run: |
+          xcodebuild -version
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -list
+
+      - name: Build unsigned iOS simulator app
+        run: |
+          set -o pipefail
+
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -sdk iphonesimulator \
+            -destination 'generic/platform=iOS Simulator' \
+            -derivedDataPath "$RUNNER_TEMP/NuvioDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            build
+
+      - name: Locate iOS app
+        run: |
+          find "$RUNNER_TEMP/NuvioDerivedData" \
+            -type d \
+            -path '*Debug-iphonesimulator/*.app' \
+            -print
+
+      - name: Package simulator app
+        run: |
+          APP_PATH="$(find "$RUNNER_TEMP/NuvioDerivedData" \
+            -type d \
+            -path '*Debug-iphonesimulator/Nuvio.app' \
+            | head -1)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Nuvio.app was not found"
+            exit 1
+          fi
+
+          ditto -c -k \
+            --sequesterRsrc \
+            --keepParent \
+            "$APP_PATH" \
+            "$RUNNER_TEMP/Nuvio-iOS-Simulator.zip"
+
+      - name: Upload iOS app artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuvio-ios-simulator-app
+          path: ${{ runner.temp }}/Nuvio-iOS-Simulator.zip
+          if-no-files-found: error
+          retention-days: 14
