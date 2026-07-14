@@ -259,8 +259,33 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create local properties
-        run: touch local.properties
+      - name: Create Nuvio runtime configuration
+        env:
+          NUVIO_SUPABASE_URL: ${{ secrets.NUVIO_SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY: ${{ secrets.NUVIO_SUPABASE_ANON_KEY }}
+          NUVIO_SUPABASE_FALLBACK_URL: ${{ secrets.NUVIO_SUPABASE_FALLBACK_URL }}
+        run: |
+          test -n "$NUVIO_SUPABASE_URL" || {
+            echo "NUVIO_SUPABASE_URL is missing"
+            exit 1
+          }
+
+          test -n "$NUVIO_SUPABASE_ANON_KEY" || {
+            echo "NUVIO_SUPABASE_ANON_KEY is missing"
+            exit 1
+          }
+
+          {
+            printf 'NUVIO_SUPABASE_URL=%s\n' "$NUVIO_SUPABASE_URL"
+            printf 'NUVIO_SUPABASE_ANON_KEY=%s\n' "$NUVIO_SUPABASE_ANON_KEY"
+            printf 'NUVIO_SUPABASE_FALLBACK_URL=%s\n' "$NUVIO_SUPABASE_FALLBACK_URL"
+          } > local.properties
+
+          chmod 600 local.properties
+
+          echo "Runtime configuration created"
+          grep '^NUVIO_SUPABASE_URL=' local.properties
+          grep '^NUVIO_SUPABASE_FALLBACK_URL=' local.properties
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
@@ -272,6 +297,30 @@ jobs:
             -project iosApp/iosApp.xcodeproj \
             -scheme iosApp \
             -list
+
+      - name: Verify generated Supabase configuration
+        run: |
+          ./gradlew :composeApp:generateRuntimeConfigs --no-configuration-cache
+
+          CONFIG_FILE="composeApp/build/generated/runtime-config/kotlin/com/nuvio/app/core/network/SupabaseConfig.kt"
+
+          test -f "$CONFIG_FILE" || {
+            echo "Generated SupabaseConfig.kt was not found"
+            exit 1
+          }
+
+          grep 'const val URL' "$CONFIG_FILE"
+          grep 'const val FALLBACK_URL' "$CONFIG_FILE"
+
+          if grep -q 'const val URL = ""' "$CONFIG_FILE"; then
+            echo "Generated Supabase URL is empty"
+            exit 1
+          fi
+
+          if grep -q 'const val ANON_KEY = ""' "$CONFIG_FILE"; then
+            echo "Generated Supabase anonymous key is empty"
+            exit 1
+          fi
 
       - name: Build unsigned iPhone app
         run: |
