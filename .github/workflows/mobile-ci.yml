@@ -98,8 +98,27 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create local properties
-        run: touch local.properties
+      - name: Create runtime configuration
+        env:
+          NUVIO_SUPABASE_URL: ${{ secrets.NUVIO_SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY: ${{ secrets.NUVIO_SUPABASE_ANON_KEY }}
+          NUVIO_SUPABASE_FALLBACK_URL: ${{ secrets.NUVIO_SUPABASE_FALLBACK_URL }}
+        run: |
+          test -n "$NUVIO_SUPABASE_URL" || {
+            echo "NUVIO_SUPABASE_URL is missing"
+            exit 1
+          }
+
+          test -n "$NUVIO_SUPABASE_ANON_KEY" || {
+            echo "NUVIO_SUPABASE_ANON_KEY is missing"
+            exit 1
+          }
+
+          cat > local.properties <<EOF
+          NUVIO_SUPABASE_URL=$NUVIO_SUPABASE_URL
+          NUVIO_SUPABASE_ANON_KEY=$NUVIO_SUPABASE_ANON_KEY
+          NUVIO_SUPABASE_FALLBACK_URL=$NUVIO_SUPABASE_FALLBACK_URL
+          EOF
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
@@ -135,8 +154,27 @@ jobs:
       - name: Set up Gradle
         uses: gradle/actions/setup-gradle@v4
 
-      - name: Create local properties
-        run: touch local.properties
+      - name: Create runtime configuration
+        env:
+          NUVIO_SUPABASE_URL: ${{ secrets.NUVIO_SUPABASE_URL }}
+          NUVIO_SUPABASE_ANON_KEY: ${{ secrets.NUVIO_SUPABASE_ANON_KEY }}
+          NUVIO_SUPABASE_FALLBACK_URL: ${{ secrets.NUVIO_SUPABASE_FALLBACK_URL }}
+        run: |
+          test -n "$NUVIO_SUPABASE_URL" || {
+            echo "NUVIO_SUPABASE_URL is missing"
+            exit 1
+          }
+
+          test -n "$NUVIO_SUPABASE_ANON_KEY" || {
+            echo "NUVIO_SUPABASE_ANON_KEY is missing"
+            exit 1
+          }
+
+          cat > local.properties <<EOF
+          NUVIO_SUPABASE_URL=$NUVIO_SUPABASE_URL
+          NUVIO_SUPABASE_ANON_KEY=$NUVIO_SUPABASE_ANON_KEY
+          NUVIO_SUPABASE_FALLBACK_URL=$NUVIO_SUPABASE_FALLBACK_URL
+          EOF
 
       - name: Make Gradle wrapper executable
         run: chmod +x gradlew
