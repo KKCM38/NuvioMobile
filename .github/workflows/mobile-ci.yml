@@ -119,6 +119,13 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
+      - name: Fetch MPVKit dependency
+        run: |
+          rm -rf MPVKit
+          git clone --depth 1 \
+            https://github.com/tapframe/MPVNuvio.git \
+            MPVKit
+
       - name: Set up Java
         uses: actions/setup-java@v4
         with:
