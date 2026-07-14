@@ -195,3 +195,94 @@ jobs:
           path: ${{ runner.temp }}/Nuvio-iOS-Simulator.zip
           if-no-files-found: error
           retention-days: 14
+
+  ios-device-ipa:
+    name: Build unsigned iPhone IPA
+    runs-on: macos-latest
+    timeout-minutes: 75
+
+    steps:
+      - name: Check out repository
+        uses: actions/checkout@v4
+
+      - name: Fetch MPVKit dependency
+        run: |
+          rm -rf MPVKit
+          git clone --depth 1 \
+            https://github.com/tapframe/MPVNuvio.git \
+            MPVKit
+
+      - name: Set up Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+
+      - name: Set up Gradle
+        uses: gradle/actions/setup-gradle@v4
+
+      - name: Create local properties
+        run: touch local.properties
+
+      - name: Make Gradle wrapper executable
+        run: chmod +x gradlew
+
+      - name: Show Xcode configuration
+        run: |
+          xcodebuild -version
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -list
+
+      - name: Build unsigned iPhone app
+        run: |
+          set -o pipefail
+
+          xcodebuild \
+            -project iosApp/iosApp.xcodeproj \
+            -scheme iosApp \
+            -configuration Debug \
+            -sdk iphoneos \
+            -destination 'generic/platform=iOS' \
+            -derivedDataPath "$RUNNER_TEMP/NuvioDeviceDerivedData" \
+            CODE_SIGNING_ALLOWED=NO \
+            CODE_SIGNING_REQUIRED=NO \
+            CODE_SIGN_IDENTITY="" \
+            build
+
+      - name: Locate device app
+        run: |
+          find "$RUNNER_TEMP/NuvioDeviceDerivedData" \
+            -type d \
+            -path '*Debug-iphoneos/Nuvio.app' \
+            -print
+
+      - name: Package unsigned IPA
+        run: |
+          APP_PATH="$(find "$RUNNER_TEMP/NuvioDeviceDerivedData" \
+            -type d \
+            -path '*Debug-iphoneos/Nuvio.app' \
+            | head -1)"
+
+          if [ -z "$APP_PATH" ]; then
+            echo "Nuvio.app device build was not found"
+            exit 1
+          fi
+
+          mkdir -p "$RUNNER_TEMP/UnsignedIPA/Payload"
+          cp -R "$APP_PATH" "$RUNNER_TEMP/UnsignedIPA/Payload/"
+
+          cd "$RUNNER_TEMP/UnsignedIPA"
+          zip -qry "$RUNNER_TEMP/Nuvio-unsigned.ipa" Payload
+
+          ls -lh "$RUNNER_TEMP/Nuvio-unsigned.ipa"
+          unzip -l "$RUNNER_TEMP/Nuvio-unsigned.ipa" | head -40
+
+      - name: Upload unsigned IPA
+        uses: actions/upload-artifact@v4
+        with:
+          name: nuvio-unsigned-iphone-ipa
+          path: ${{ runner.temp }}/Nuvio-unsigned.ipa
+          if-no-files-found: error
+          retention-days: 14
